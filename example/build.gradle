@@ -1,5 +1,6 @@
 apply from: "../common.gradle"
 
 dependencies {
-    compile project(":thread-alert")
+    implementation project(":thread-alert")
+    testImplementation "junit:junit:4.12"
 }
