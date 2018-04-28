@@ -1,2 +1,5 @@
 rootProject.name = 'thread-alert'
+include 'sdk'
+findProject(':sdk')?.name = 'thread-alert'
+include 'example'
 
