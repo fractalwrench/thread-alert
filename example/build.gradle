@@ -3,4 +3,5 @@ apply from: "../common.gradle"
 dependencies {
     implementation project(":thread-alert")
     testImplementation "junit:junit:4.12"
+    implementation 'org.javassist:javassist:3.22.0-GA'
 }
