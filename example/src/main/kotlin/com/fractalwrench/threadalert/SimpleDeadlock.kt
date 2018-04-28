@@ -2,7 +2,7 @@ package com.fractalwrench.threadalert
 
 import java.util.concurrent.locks.ReentrantLock
 
-internal class SimpleDeadlock {
+internal class SimpleDeadlock{
 
     val lock = ReentrantLock()
 
