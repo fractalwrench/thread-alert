@@ -12,48 +12,64 @@ import java.util.concurrent.atomic.AtomicLong
 
 class ThreadSafetyTest {
 
-    val iterations = 1000
+    /**
+     * Acquires a lock and never unlocks it
+     */
+    @Test(expected = AssertionError::class)
+    fun testDeadlockFail() {
+        val deadlockExample = DeadlockFail()
 
-    @Test
-    fun testDeadlock() {
-        val example = SimpleDeadlock()
-        val latch = CountDownLatch(iterations)
-
-        for (n in 1..iterations) {
-            val r = Runnable {
-                example.hangForever()
-                println("Completed $n")
-                latch.countDown()
-            }
-            Thread(r).start() // FIXME might use up a few too many resources =)
-        }
-
-        latch.await(100, TimeUnit.MILLISECONDS)
-        val count = latch.count
-        Assert.assertEquals(0, count)
+        execute(deadlockExample::hangForever)
+                .repeat(100) // avoid claiming all the system resources
+                .verify()
     }
 
+    /**
+     * Acquires a lock then unlocks it
+     */
     @Test
-    fun testConcurrentModification() {
-        val example = ConcurrentModification()
-        val latch = CountDownLatch(iterations)
+    fun testDeadlockPass() {
+        val deadlockExample = DeadlockPass()
 
-        for (n in 1..iterations) {
-            val r = Runnable {
-                example.addToList("test")
-                example.iterate()
-                latch.countDown()
-            }
-            Thread(r).start()
-        }
-
-        latch.await(100, TimeUnit.MILLISECONDS)
-        val count = latch.count
-        Assert.assertEquals(0, count)
+        execute(deadlockExample::hangForever)
+                .repeat(100) // avoid claiming all the system resources
+                .verify()
     }
+
+    /**
+     * Modifies a non-thread safe collection while an iterator is in use
+     */
+    @Test(expected = AssertionError::class)
+    fun testConcurrentModificationFail() {
+        val example = ConcurrentModificationFail()
+
+        execute {
+            example.addToList("test")
+            example.iterate()
+        }.verify()
+    }
+
+    /**
+     * Modifies a thread safe collection while an iterator is in use
+     */
+    @Test
+    fun testConcurrentModificationPass() {
+        val example = ConcurrentModificationPass()
+
+        execute {
+            example.addToList("test")
+            example.iterate()
+        }.verify()
+    }
+
+
+
+    // TODO below
+
 
     @Test
     fun testNpe() {
+        val iterations = 5000 // number of iterations
         val example = PossibleNpe()
         val latch = CountDownLatch(iterations)
 
@@ -71,32 +87,49 @@ class ThreadSafetyTest {
         Assert.assertEquals(0, count)
     }
 
+
+
+    /**
+     * Asserts that a method is called multiple times due to a lack of locks/semaphores
+     */
     @Test
-    fun testCalledOnce() {
-        val latch = CountDownLatch(iterations)
+    fun testSemaphoreFail() {
         val handler = MethodCallCountHandler()
         val obj = generateProxiedObject(handler)
 
-        for (n in 1..iterations) {
-            val r = Runnable {
-                obj.doSomething()
-                latch.countDown()
-            }
-            Thread(r).start()
+        execute {
+            obj.doSomething()
         }
-        latch.await(1500, TimeUnit.MILLISECONDS)
-        Assert.assertEquals(1, handler.count.get())
-
+                .timeout(1500, TimeUnit.MILLISECONDS)
+                .verify { handler.count.get() == 1L } // TODO assert to get error message?
     }
 
-    private fun generateProxiedObject(handler: MethodCallCountHandler): AcquireSemaphore {
+    /**
+     * Asserts that a method is only called once
+     */
+    @Test
+    fun testSemaphorePass() {
+        val handler = MethodCallCountHandler()
+        val obj = generateProxiedObject(handler)
+
+        execute {
+            obj.doSomething()
+        }
+                .timeout(1500, TimeUnit.MILLISECONDS)
+                .verify { handler.count.get() == 1L } // TODO assert to get error message?
+    }
+
+
+
+    // TODO integrate into lib
+
+    private fun generateProxiedObject(handler: MethodCallCountHandler): SemaphoreFail {
         val proxyFactory = ProxyFactory()
-        proxyFactory.superclass = AcquireSemaphore::class.java
+        proxyFactory.superclass = SemaphoreFail::class.java
         proxyFactory.setFilter { it.name == "performFoo" }
 
         val create = proxyFactory.create(arrayOf(), arrayOf(), handler)
-        val obj = create as AcquireSemaphore
-        return obj
+        return create as SemaphoreFail
     }
 
     class MethodCallCountHandler : MethodHandler {
