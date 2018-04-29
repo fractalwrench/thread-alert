@@ -1,12 +1,7 @@
 package com.fractalwrench.threadalert
 
-import javassist.util.proxy.MethodHandler
-import javassist.util.proxy.ProxyFactory
-import org.junit.Assert
 import org.junit.Test
-import java.lang.reflect.Method
 import java.util.*
-import java.util.concurrent.atomic.AtomicLong
 
 
 class ThreadSafetyTest {
@@ -88,25 +83,19 @@ class ThreadSafetyTest {
         }.verify()
     }
 
-
-    // TODO below
-
-
     /**
      * Asserts that a method is called multiple times due to a lack of locks/semaphores
      */
-    @Test
+    @Test(expected = AssertionError::class)
     fun testSemaphoreFail() {
         val handler = MethodCallCountHandler()
-        val obj = generateProxiedObject(handler, { it.name == "performFoo" }) as SemaphoreFail
+        val obj = generateProxyObject(handler, SemaphoreFail::class.java, {
+            it.name == "performFoo"
+        }) as SemaphoreFail
 
-        execute({
-            obj.doSomething()
-        })
+        execute { obj.doSomething() }
                 .completeExecution(false)
-                .verify {
-                    Assert.assertEquals(1, handler.count.get())
-                }
+                .verify { calledOnce(handler) }
     }
 
     /**
@@ -115,39 +104,13 @@ class ThreadSafetyTest {
     @Test
     fun testSemaphorePass() {
         val handler = MethodCallCountHandler()
-        val obj = generateProxiedObject(handler, { it.name == "performFoo" }) as SemaphoreFail
+        val obj = generateProxyObject(handler, SemaphorePass::class.java, {
+            it.name == "performFoo"
+        }) as SemaphorePass
 
-        execute {
-            obj.doSomething()
-        }
+        execute { obj.doSomething() }
                 .completeExecution(false)
-                .verify {
-                    Assert.assertEquals(1, handler.count.get())
-                }
+                .verify { calledOnce(handler) }
     }
-
-
-    // TODO integrate into lib
-
-    private fun generateProxiedObject(handler: MethodCallCountHandler, methodFilter: (Method) -> Boolean): Any {
-        val proxyFactory = ProxyFactory()
-        proxyFactory.superclass = SemaphorePass::class.java
-        proxyFactory.setFilter(methodFilter) // FIXME
-
-        val create = proxyFactory.create(arrayOf(), arrayOf(), handler)
-        return create as SemaphorePass
-    }
-
-    class MethodCallCountHandler : MethodHandler {
-        val count: AtomicLong = AtomicLong()
-
-        override fun invoke(self: Any?, thisMethod: Method?, proceed: Method?, args: Array<out Any>?): Any {
-            count.incrementAndGet()
-            return proceed!!.invoke(self) // FIXME only supports non-void methods with no params
-        }
-
-    }
-
 
 }
-

@@ -1,8 +1,12 @@
 package com.fractalwrench.threadalert
 
+import javassist.util.proxy.MethodHandler
+import javassist.util.proxy.ProxyFactory
+import java.lang.reflect.Method
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Executes an action concurrently on a large thread pool, thus testing its thread-safety.
@@ -11,10 +15,10 @@ fun execute(action: () -> Unit): ThreadAlert = ThreadAlert(action)
 
 class ThreadAlert(private val action: () -> Unit) {
 
+    private val threadPool = Executors.newFixedThreadPool(100)
     private var repeat = 1000
     private var timeout = 100L
     private var completeExecution: Boolean = true
-    private val threadPool = Executors.newFixedThreadPool(100)
 
     /**
      * Configures the amount of times the action should be repeated (1000 by default)
@@ -43,10 +47,11 @@ class ThreadAlert(private val action: () -> Unit) {
     /**
      * Verifies that the action completes without any exceptions, and that each action finished execution.
      */
-    fun verify() {
+    fun verify(): ThreadAlert {
         val latch = CountDownLatch(repeat)
         val throwable = performWork(latch)
         verifyAssertions(latch, throwable)
+        return this
     }
 
     /**
@@ -54,9 +59,13 @@ class ThreadAlert(private val action: () -> Unit) {
      *
      * Additionally, custom verification can then take place.
      */
-    fun verify(action: () -> Unit) {
+    fun verify(action: () -> Boolean): ThreadAlert {
         verify()
-        action()
+        if (!action()) {
+            printFailure("Custom assertion failure")
+            throw AssertionError("")
+        }
+        return this
     }
 
     private fun performWork(latch: CountDownLatch): Throwable? {
@@ -97,3 +106,27 @@ class ThreadAlert(private val action: () -> Unit) {
     }
 
 }
+
+class MethodCallCountHandler : MethodHandler {
+    val count: AtomicLong = AtomicLong()
+
+    override fun invoke(self: Any?, thisMethod: Method?, proceed: Method?, args: Array<out Any>?): Any {
+        count.incrementAndGet()
+        return proceed!!.invoke(self) // FIXME only supports non-void methods with no params
+    }
+}
+
+/**
+ * Generates a proxied object using Javassist to hack the class bytecode at runtime. This allows us
+ * to count the number of times a method is called and other custom behaviour.
+ */
+fun generateProxyObject(handler: MethodCallCountHandler,
+                        clz: Class<out Any>,
+                        methodFilter: (Method) -> Boolean): Any {
+    val proxyFactory = ProxyFactory()
+    proxyFactory.superclass = clz
+    proxyFactory.setFilter(methodFilter)
+    return proxyFactory.create(arrayOf(), arrayOf(), handler)
+}
+
+fun calledOnce(handler: MethodCallCountHandler) = 1L == handler.count.get()
