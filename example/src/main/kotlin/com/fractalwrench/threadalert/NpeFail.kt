@@ -1,6 +1,6 @@
 package com.fractalwrench.threadalert
 
-internal class PossibleNpe {
+internal class NpeFail {
 
     var data: String? = "test"
         set(value) {

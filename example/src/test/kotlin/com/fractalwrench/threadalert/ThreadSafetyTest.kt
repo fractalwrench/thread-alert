@@ -2,11 +2,9 @@ package com.fractalwrench.threadalert
 
 import javassist.util.proxy.MethodHandler
 import javassist.util.proxy.ProxyFactory
-import org.junit.Assert
 import org.junit.Test
 import java.lang.reflect.Method
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 
 
@@ -39,7 +37,7 @@ class ThreadSafetyTest {
     /**
      * Modifies a non-thread safe collection while an iterator is in use
      */
-    @Test(expected = AssertionError::class)
+    @Test(expected = ConcurrentModificationException::class)
     fun testConcurrentModificationFail() {
         val example = ConcurrentModificationFail()
 
@@ -62,31 +60,32 @@ class ThreadSafetyTest {
         }.verify()
     }
 
+    @Test(expected = NullPointerException::class)
+    fun testNpeFail() {
+        val example = NpeFail()
+
+        execute {
+            for (n in 1..10) {
+                example.data = "test"
+                example.data!!
+            }
+        }.verify()
+    }
+
+    @Test
+    fun testNpePass() {
+        val example = NpePass()
+
+        execute {
+            for (n in 1..10) {
+                example.data = "test"
+                example.data!!
+            }
+        }.verify()
+    }
 
 
     // TODO below
-
-
-    @Test
-    fun testNpe() {
-        val iterations = 5000 // number of iterations
-        val example = PossibleNpe()
-        val latch = CountDownLatch(iterations)
-
-        for (n in 1..iterations) {
-            val r = Runnable {
-                example.data = "test"
-                example.data!!
-                latch.countDown()
-            }
-            Thread(r).start()
-        }
-
-        latch.await(100, TimeUnit.MILLISECONDS)
-        val count = latch.count
-        Assert.assertEquals(0, count)
-    }
-
 
 
     /**
@@ -100,7 +99,7 @@ class ThreadSafetyTest {
         execute {
             obj.doSomething()
         }
-                .timeout(1500, TimeUnit.MILLISECONDS)
+                .timeout(1500)
                 .verify { handler.count.get() == 1L } // TODO assert to get error message?
     }
 
@@ -115,10 +114,9 @@ class ThreadSafetyTest {
         execute {
             obj.doSomething()
         }
-                .timeout(1500, TimeUnit.MILLISECONDS)
+                .timeout(1500)
                 .verify { handler.count.get() == 1L } // TODO assert to get error message?
     }
-
 
 
     // TODO integrate into lib

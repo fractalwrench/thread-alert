@@ -2,10 +2,12 @@ package com.fractalwrench.threadalert
 
 internal class ConcurrentModificationFail {
 
-    var values = mutableListOf("abc", "def", "ghs")
+    private var values = mutableListOf("abc", "def", "ghs")
 
     fun iterate() {
-        values.forEach { it.length }
+        values.forEach {
+            it.length
+        }
     }
 
     fun addToList(v: String) {

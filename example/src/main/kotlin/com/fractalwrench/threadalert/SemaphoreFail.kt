@@ -5,7 +5,7 @@ internal open class SemaphoreFail {
     fun doSomething() = performFoo()
 
     open fun performFoo(): String {
-        Thread.sleep(1000)
+        Thread.sleep(100)
         return "s"
     }
 
