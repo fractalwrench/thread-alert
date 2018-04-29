@@ -104,7 +104,7 @@ class ThreadSafetyTest {
             obj.doSomething()
         })
                 .completeExecution(false)
-                .verify() {
+                .verify {
                     Assert.assertEquals(1, handler.count.get())
                 }
     }

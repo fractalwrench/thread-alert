@@ -4,6 +4,9 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
+/**
+ * Executes an action concurrently on a large thread pool, thus testing its thread-safety.
+ */
 fun execute(action: () -> Unit): ThreadAlert = ThreadAlert(action)
 
 class ThreadAlert(private val action: () -> Unit) {
@@ -13,25 +16,47 @@ class ThreadAlert(private val action: () -> Unit) {
     private var completeExecution: Boolean = true
     private val threadPool = Executors.newFixedThreadPool(100)
 
+    /**
+     * Configures the amount of times the action should be repeated (1000 by default)
+     */
     fun repeat(times: Int): ThreadAlert {
         this.repeat = times
         return this
     }
 
+    /**
+     * Configures the amount of time to wait for execution to complete (100ms by default)
+     */
     fun timeout(ms: Long): ThreadAlert {
         this.timeout = ms
         return this
     }
 
+    /**
+     * Configures whether or not it should be mandatory for all actions to complete execution (true by default)
+     */
     fun completeExecution(completeExecution: Boolean): ThreadAlert {
         this.completeExecution = completeExecution
         return this
     }
 
+    /**
+     * Verifies that the action completes without any exceptions, and that each action finished execution.
+     */
     fun verify() {
         val latch = CountDownLatch(repeat)
         val throwable = performWork(latch)
         verifyAssertions(latch, throwable)
+    }
+
+    /**
+     * Verifies that the action completes without any exceptions, and that each action finished execution.
+     *
+     * Additionally, custom verification can then take place.
+     */
+    fun verify(action: () -> Unit) {
+        verify()
+        action()
     }
 
     private fun performWork(latch: CountDownLatch): Throwable? {
@@ -64,11 +89,6 @@ class ThreadAlert(private val action: () -> Unit) {
                     "or investigate crashes or potential deadlocks.")
             throw AssertionError("")
         }
-    }
-
-    fun verify(action: () -> Unit) {
-        verify()
-        action()
     }
 
     private fun printFailure(msg: String) {
