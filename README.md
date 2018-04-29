@@ -18,7 +18,7 @@ execute(deadlockExample.hangForever())
 ```
 
 ## Scenarios
-The example module contains failing/passing scenarios for:
+The [example module](example) contains failing/passing scenarios for:
 
 - ConcurrentModification
 - Deadlock
@@ -28,6 +28,6 @@ The example module contains failing/passing scenarios for:
 
 ## Future Work/Notes
 
-- Ensuring variables are `volatile` is a tricky problem, as compilers don't seem to guarantee
+- Ensuring variables are `volatile` is a tricky problem, as weird behaviour isn't guaranteed by the JLS.
 - API design may need a bit of rework
 - MethodCallHandler is a bit hackish + needs testing with different method signatures
