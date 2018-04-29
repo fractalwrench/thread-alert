@@ -1,6 +1,7 @@
 package com.fractalwrench.threadalert
 
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 fun execute(action: () -> Unit): ThreadAlert = ThreadAlert(action)
@@ -9,6 +10,8 @@ class ThreadAlert(private val action: () -> Unit) {
 
     private var repeat = 1000
     private var timeout = 100L
+    private var completeExecution: Boolean = true
+    private val threadPool = Executors.newFixedThreadPool(100)
 
     fun repeat(times: Int): ThreadAlert {
         this.repeat = times
@@ -20,43 +23,52 @@ class ThreadAlert(private val action: () -> Unit) {
         return this
     }
 
+    fun completeExecution(completeExecution: Boolean): ThreadAlert {
+        this.completeExecution = completeExecution
+        return this
+    }
+
     fun verify() {
         val latch = CountDownLatch(repeat)
+        val throwable = performWork(latch)
+        verifyAssertions(latch, throwable)
+    }
+
+    private fun performWork(latch: CountDownLatch): Throwable? {
         var throwable: Throwable? = null
 
-        for (n in 0..repeat) {
-            val r = Runnable {
+        for (n in 1..repeat) {
+            threadPool.submit({
                 try {
                     action()
                 } catch (e: Throwable) {
                     throwable = e
                 }
                 latch.countDown()
-            }
-            Thread(r).start()
+            })
         }
-
         latch.await(timeout, TimeUnit.MILLISECONDS)
+        return throwable
+    }
+
+    private fun verifyAssertions(latch: CountDownLatch, throwable: Throwable?) {
         val count = latch.count
 
         if (throwable != null) {
             printFailure("Encountered at least one exception in execution." +
                     " Showing most recent stacktrace")
             println(throwable)
-            throw throwable as Throwable
-        } else if (count != 0L) {
+            throw throwable
+        } else if (count != 0L && completeExecution) {
             printFailure("$count runnables did not complete execution. Increase the timeout " +
                     "or investigate crashes or potential deadlocks.")
             throw AssertionError("")
         }
     }
 
-    fun verify(action: () -> Boolean) {
+    fun verify(action: () -> Unit) {
         verify()
-        if (!action()) {
-            printFailure("Custom verification method failed.")
-            throw AssertionError("")
-        }
+        action()
     }
 
     private fun printFailure(msg: String) {

@@ -6,7 +6,8 @@ internal class ConcurrentModificationFail {
 
     fun iterate() {
         values.forEach {
-            it.length
+            @Suppress("UNNECESSARY_SAFE_CALL")
+            it?.length // not thread safe, ignore the non-null warning
         }
     }
 

@@ -2,6 +2,7 @@ package com.fractalwrench.threadalert
 
 import javassist.util.proxy.MethodHandler
 import javassist.util.proxy.ProxyFactory
+import org.junit.Assert
 import org.junit.Test
 import java.lang.reflect.Method
 import java.util.*
@@ -60,6 +61,9 @@ class ThreadSafetyTest {
         }.verify()
     }
 
+    /**
+     * Coerces a property that can be set as null by other threads to non-null
+     */
     @Test(expected = NullPointerException::class)
     fun testNpeFail() {
         val example = NpeFail()
@@ -94,13 +98,15 @@ class ThreadSafetyTest {
     @Test
     fun testSemaphoreFail() {
         val handler = MethodCallCountHandler()
-        val obj = generateProxiedObject(handler)
+        val obj = generateProxiedObject(handler, { it.name == "performFoo" }) as SemaphoreFail
 
-        execute {
+        execute({
             obj.doSomething()
-        }
-                .timeout(1500)
-                .verify { handler.count.get() == 1L } // TODO assert to get error message?
+        })
+                .completeExecution(false)
+                .verify() {
+                    Assert.assertEquals(1, handler.count.get())
+                }
     }
 
     /**
@@ -109,25 +115,27 @@ class ThreadSafetyTest {
     @Test
     fun testSemaphorePass() {
         val handler = MethodCallCountHandler()
-        val obj = generateProxiedObject(handler)
+        val obj = generateProxiedObject(handler, { it.name == "performFoo" }) as SemaphoreFail
 
         execute {
             obj.doSomething()
         }
-                .timeout(1500)
-                .verify { handler.count.get() == 1L } // TODO assert to get error message?
+                .completeExecution(false)
+                .verify {
+                    Assert.assertEquals(1, handler.count.get())
+                }
     }
 
 
     // TODO integrate into lib
 
-    private fun generateProxiedObject(handler: MethodCallCountHandler): SemaphoreFail {
+    private fun generateProxiedObject(handler: MethodCallCountHandler, methodFilter: (Method) -> Boolean): Any {
         val proxyFactory = ProxyFactory()
-        proxyFactory.superclass = SemaphoreFail::class.java
-        proxyFactory.setFilter { it.name == "performFoo" }
+        proxyFactory.superclass = SemaphorePass::class.java
+        proxyFactory.setFilter(methodFilter) // FIXME
 
         val create = proxyFactory.create(arrayOf(), arrayOf(), handler)
-        return create as SemaphoreFail
+        return create as SemaphorePass
     }
 
     class MethodCallCountHandler : MethodHandler {

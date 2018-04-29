@@ -18,7 +18,7 @@ internal open class SemaphorePass {
     }
 
     open fun performFoo(): String {
-        Thread.sleep(1000)
+        Thread.sleep(1500)
         return "s"
     }
 
